@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Packaging
+*.egg-info/
+.eggs/
+
+# VS Code
+.vscode/
+
+# Temporary and generated files
+*.log
+*.tmp
+*.swp
+
+# Output files
+*.pgm
+*.png
+
+# Service storage
+distributed_services/input_storage/
+distributed_services/output_storage/
+distributed_services/processor_storage/
+
+downloaded_edge.*
+output_test.pgm

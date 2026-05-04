@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Distributed Image Processor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --border: #1e1e2e;
+      --accent: #00ffaa;
+      --accent2: #7c3aed;
+      --text: #e2e2f0;
+      --muted: #555570;
+      --error: #ff4466;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,255,170,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,170,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 620px;
+    }
+
+    .header {
+      margin-bottom: 40px;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,255,170,0.08);
+      border: 1px solid rgba(0,255,170,0.2);
+      color: var(--accent);
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+      letter-spacing: 0.1em;
+    }
+
+    .badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      font-family: 'Space Mono', monospace;
+      line-height: 1.6;
+    }
+
+    .pipeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 32px;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+
+    .pipe-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .pipe-dot {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .pipe-dot.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px rgba(0,255,170,0.3);
+    }
+
+    .pipe-label {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.05em;
+      text-align: center;
+    }
+
+    .pipe-line {
+      flex: 1;
+      height: 2px;
+      background: var(--border);
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pipe-line::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .pipe-line.flowing::after {
+      animation: flow 1.5s infinite;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      animation: fadeUp 0.6s 0.3s ease both;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+    }
+
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+      background: rgba(255,255,255,0.01);
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(0,255,170,0.04);
+    }
+
+    .dropzone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon { font-size: 36px; margin-bottom: 12px; display: block; }
+    .drop-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .drop-sub { font-size: 12px; color: var(--muted); font-family: 'Space Mono', monospace; }
+
+    .file-chosen {
+      margin-top: 12px;
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      color: var(--accent);
+      display: none;
+    }
+
+    .btn {
+      width: 100%;
+      margin-top: 20px;
+      padding: 16px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,255,170,0.3);
+    }
+
+    .btn:active:not(:disabled) { transform: translateY(0); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.loading { color: transparent; }
+
+    .btn.loading::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 20px; height: 20px;
+      border: 2px solid rgba(0,0,0,0.3);
+      border-top-color: #000;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      animation: spin 0.8s linear infinite;
+    }
+
+    .status {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .status.success {
+      background: rgba(0,255,170,0.06);
+      border-color: rgba(0,255,170,0.2);
+      color: var(--accent);
+    }
+
+    .status.error {
+      background: rgba(255,68,102,0.06);
+      border-color: rgba(255,68,102,0.2);
+      color: var(--error);
+    }
+
+    .status-icon { flex-shrink: 0; font-size: 14px; }
+
+    .downloads {
+      margin-top: 20px;
+      display: none;
+      gap: 12px;
+      flex-direction: column;
+    }
+
+    .downloads.show { display: flex; }
+
+    .dl-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 13px;
+      font-family: 'Space Mono', monospace;
+      transition: all 0.2s;
+    }
+
+    .dl-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(0,255,170,0.05);
+    }
+
+    .dl-btn span { font-size: 11px; color: var(--muted); }
+
+    .footer {
+      margin-top: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      animation: fadeUp 0.6s 0.5s ease both;
+    }
+
+    .footer-tag {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .footer-dots { display: flex; gap: 4px; }
+    .footer-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+    .footer-dots span:nth-child(1) { background: var(--accent2); }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    @keyframes flow {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+    @keyframes spin {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Distributed FPGA Based<br/><span>Image Processor</span></h1>
+      <p class="subtitle">// Upload .ppm → Edge detect → Download output</p>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-node">
+        <div class="pipe-dot active" id="node1">📥</div>
+        <div class="pipe-label">INPUT</div>
+      </div>
+      <div class="pipe-line" id="line1"></div>
+      <div class="pipe-node">
+        <div class="pipe-dot" id="node2">⚙️</div>
+        <div class="pipe-label">PROCESSOR</div>
+      </div>
+      <div class="pipe-line" id="line2"></div>
+      <div class="pipe-node">
+        <div class="pipe-dot" id="node3">📤</div>
+        <div class="pipe-label">OUTPUT</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept=".ppm" />
+        <span class="drop-icon">🖼️</span>
+        <div class="drop-title">Drop your PPM file here</div>
+        <div class="drop-sub">or click to browse · .ppm only</div>
+        <div class="file-chosen" id="fileChosen">— no file selected —</div>
+      </div>
+
+      <button class="btn" id="uploadBtn">PROCESS IMAGE →</button>
+
+      <div class="status" id="statusBox">
+        <span class="status-icon">○</span>
+        <span id="statusText">Ready. Select a .ppm file to begin.</span>
+      </div>
+
+      <div class="downloads" id="downloads">
+        <a class="dl-btn" id="dlPgm" href="#" target="_blank">
+           Download PGM Result <span>raw output</span>
+        </a>
+        <a class="dl-btn" id="dlPng" href="#" target="_blank">
+           Download PNG Result <span>image preview</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+const INPUT_URL = 'https://c-hardware-accelerator-model-production.up.railway.app/upload';
+const OUTPUT_BASE = "https://authentic-enchantment-production-785d.up.railway.app";
+
+// (optional but good for viva health check)
+const INPUT_HEALTH = INPUT_URL.replace("/upload", "/health");
+const OUTPUT_HEALTH = OUTPUT_BASE + "/health";
+
+console.log("🔗 Input Service:", INPUT_HEALTH);
+console.log("🔗 Output Service:", OUTPUT_HEALTH);
+
+const fileInput = document.getElementById('fileInput');
+const uploadBtn = document.getElementById('uploadBtn');
+const statusBox = document.getElementById('statusBox');
+const statusText = document.getElementById('statusText');
+const fileChosen = document.getElementById('fileChosen');
+const downloads = document.getElementById('downloads');
+const dlPgm = document.getElementById('dlPgm');
+const dlPng = document.getElementById('dlPng');
+const dropzone = document.getElementById('dropzone');
+
+const node1 = document.getElementById('node1');
+const node2 = document.getElementById('node2');
+const node3 = document.getElementById('node3');
+const line1 = document.getElementById('line1');
+const line2 = document.getElementById('line2');
+
+function setStatus(text, type = 'default') {
+  statusBox.className = 'status ' + (type === 'success' ? 'success' : type === 'error' ? 'error' : '');
+  const icons = { success: '✓', error: '✕', default: '○' };
+  statusBox.querySelector('.status-icon').textContent = icons[type] || '○';
+  statusText.textContent = text;
+
+  console.log("📡 STATUS:", text);
+}
+
+function setNodeActive(n) {
+  [node1, node2, node3].forEach((nd, i) => nd.classList.toggle('active', i < n));
+  [line1, line2].forEach((ln, i) => ln.classList.toggle('flowing', i < n - 1));
+}
+
+// FILE SELECT
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) {
+    fileChosen.style.display = 'block';
+    fileChosen.textContent = '→ ' + fileInput.files[0].name;
+    setStatus('File ready. Click PROCESS IMAGE to start.');
+  }
+});
+
+// DRAG DROP
+dropzone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropzone.classList.add('dragover');
+});
+
+dropzone.addEventListener('dragleave', () => {
+  dropzone.classList.remove('dragover');
+});
+
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+
+  if (e.dataTransfer.files.length) {
+    fileInput.files = e.dataTransfer.files;
+    fileChosen.style.display = 'block';
+    fileChosen.textContent = '→ ' + e.dataTransfer.files[0].name;
+  }
+});
+
+// UPLOAD FLOW
+uploadBtn.addEventListener('click', async () => {
+
+  if (!fileInput.files.length) {
+    setStatus('Please select a .ppm file first.', 'error');
+    return;
+  }
+
+  const file = fileInput.files[0];
+
+  if (!file.name.toLowerCase().endsWith('.ppm')) {
+    setStatus('Only .ppm files are supported.', 'error');
+    return;
+  }
+
+  uploadBtn.disabled = true;
+  downloads.classList.remove('show');
+
+  setNodeActive(1);
+  setStatus('Uploading to input service...');
+
+  const data = new FormData();
+  data.append('file', file);
+
+  try {
+
+    // STEP 1 → Upload
+    const response = await fetch(INPUT_URL, {
+      method: 'POST',
+      body: data,
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || 'Upload failed');
+    }
+
+    const result = await response.json();
+
+    console.log("RESPONSE:", result);
+
+    const filename = result.output_file;
+
+    // STEP 2 → Processing UI delay (visual pipeline)
+    setTimeout(() => {
+      setNodeActive(2);
+      setStatus('Processing on distributed processor...');
+    }, 500);
+
+    // STEP 3 → Output
+    setTimeout(() => {
+      setNodeActive(3);
+      setStatus('Processing complete! Download ready.', 'success');
+    }, 1200);
+
+    const outputUrl = `${OUTPUT_BASE}/download?filename=${filename}`;
+    const pngUrl = `${OUTPUT_BASE}/download?filename=${filename}&format=png`;
+
+    dlPgm.href = outputUrl;
+    dlPng.href = pngUrl;
+    downloads.classList.add('show');
+
+  } catch (err) {
+    console.error(" ERROR:", err);
+    setStatus('Error: ' + err.message, 'error');
+    setNodeActive(1);
+  } finally {
+    uploadBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

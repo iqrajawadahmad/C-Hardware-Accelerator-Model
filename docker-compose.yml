@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+
+  output:
+    build:
+      context: .
+      dockerfile: Dockerfile.output
+    container_name: output_service
+    working_dir: /app/distributed_services
+    ports:
+      - "8300:8300"
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - ./distributed_services/output_storage:/app/distributed_services/output_storage
+
+  processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.processor
+    container_name: processor_service
+    working_dir: /app/distributed_services
+    ports:
+      - "8200:8200"
+    environment:
+      - OUTPUT_URL=http://output:8300
+    restart: unless-stopped
+    depends_on:
+      - output
+    volumes:
+      - ./distributed_services/processor_storage:/app/distributed_services/processor_storage
+
+  input:
+    build:
+      context: .
+      dockerfile: Dockerfile.input
+    container_name: input_service
+    working_dir: /app/distributed_services
+    ports:
+      - "8100:8100"
+    environment:
+      - PROCESSOR_URL=http://processor:8200
+    restart: unless-stopped
+    depends_on:
+      - processor
+    volumes:
+      - ./distributed_services/input_storage:/app/distributed_services/input_storage
