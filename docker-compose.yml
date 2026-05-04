@@ -24,11 +24,11 @@ services:
     working_dir: /app/distributed_services
     ports:
       - "8200:8200"
-    environment:
-      - OUTPUT_URL=http://output:8300
-    restart: unless-stopped
+    env_file:
+      - .env
     depends_on:
       - output
+    restart: unless-stopped
     volumes:
       - ./distributed_services/processor_storage:/app/distributed_services/processor_storage
 
@@ -40,10 +40,10 @@ services:
     working_dir: /app/distributed_services
     ports:
       - "8100:8100"
-    environment:
-      - PROCESSOR_URL=http://processor:8200
-    restart: unless-stopped
+    env_file:
+      - .env
     depends_on:
       - processor
+    restart: unless-stopped
     volumes:
       - ./distributed_services/input_storage:/app/distributed_services/input_storage
