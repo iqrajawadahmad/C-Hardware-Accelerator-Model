@@ -27,3 +27,6 @@ distributed_services/processor_storage/
 
 downloaded_edge.*
 output_test.pgm
+
+.env
+*.env
