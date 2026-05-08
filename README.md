@@ -116,3 +116,5 @@ P6
 | Input Image |  Final Output |
 |------------ |---------------|
 | ![](images/input.png) | ![](images/output.png) |
+
+///docker compose up

@@ -8,7 +8,7 @@ COPY distributed_services/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN make processor
+#RUN make processor
 
 WORKDIR /app/distributed_services
 EXPOSE 8100
