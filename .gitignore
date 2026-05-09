@@ -30,3 +30,6 @@ output_test.pgm
 
 .env
 *.env
+
+# Local backup of the old nested distributed_services Git metadata
+distributed_services_git_backup/
